@@ -26,6 +26,31 @@ object Example2 extends App {
       |SELECT * FROM orders
       |""".stripMargin).show()
 
+  spark.sql(
+    """
+      |SELECT * FROM orders_items
+      |""".stripMargin).show()
+
+
+  spark.sql(
+    """
+      |SELECT * FROM orders_items_refunds
+      |""".stripMargin).show()
+
+
+  spark.sql(
+    """
+      |SELECT * FROM website_pageviews
+      |""".stripMargin).show()
+
+  spark.sql(
+    """
+      |SELECT * FROM website_sessions
+      |""".stripMargin).show()
+
+
+
+
 
 
 
