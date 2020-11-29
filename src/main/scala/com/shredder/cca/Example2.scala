@@ -48,6 +48,10 @@ object Example2 extends App {
       |SELECT * FROM website_sessions
       |""".stripMargin).show()
 
+  spark.sql(
+    """
+      |SELECT * FROM website_sessions
+      |""".stripMargin).show()
 
 
 
