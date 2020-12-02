@@ -249,7 +249,18 @@ object Example2 extends App {
       |""".stripMargin).show(100,truncate = false)
   /* We can we better traffic now at Desktop after bid changes */
 
-
+  println("Total Pageviews ")
+  spark.sql(
+    """
+      | SELECT
+      | pageview_url,
+      | COUNT(DISTINCT website_pageview_id) as total_hits
+      | FROM website_pageviews
+      | WHERE website_pageview_id < 10000
+      | GROUP BY pageview_url
+      | ORDER BY total_hits DESC
+      |
+      |""".stripMargin).show(100,truncate = false)
 
 
 
