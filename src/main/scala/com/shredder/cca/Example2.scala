@@ -485,27 +485,179 @@ object Example2 extends App {
       |""".stripMargin).show(10,truncate = false)
 
 
+  println("Total Session on /home and the total bounce  of it , along with bounce_rate as of 2012-06-14 ")
 
 
+    //STEP 1 - GETTING SESSION'S LANDING PAGE WHICH ARE /home
+
+    spark.sql(
+      """
+        | SELECT
+        |
+        | ws.website_session_id,
+        | MIN(wp.website_pageview_id) AS first_pageview_id
+        |
+        | FROM website_pageviews wp
+        | JOIN website_sessions ws ON wp.website_session_id = ws.website_session_id
+        | WHERE ws.created_at < '2012-06-14'
+        | GROUP BY ws.website_session_id
+        | ORDER BY ws.website_session_id
+        |
+        |
+        |
+        |""".stripMargin).createOrReplaceTempView("session_to_fpv_id")
 
 
+      //STEP 2 -  GETTING all session ids landing to homepage
 
 
+    spark.sql(
+      """
+        |
+        | SELECT
+        |
+        | sfpv.website_session_id ,
+        | pv.pageview_url as landing_page
+        |
+        | FROM website_pageviews pv
+        | RIGHT JOIN session_to_fpv_id sfpv ON sfpv.first_pageview_id = pv.website_pageview_id
+        |
+        | WHERE pv.pageview_url= '/home'
+        | ORDER BY sfpv.website_session_id
+        |
+        |
+        |
+        |""".stripMargin).createOrReplaceTempView("all_session_to_homepage")
 
 
+    //STEP 3 - Finding only session what are bounced from homepage i.e  total_page_hits = 1
 
 
+  spark.sql(
+    """
+      |
+      | SELECT
+      |
+      | sth.website_session_id,
+      | COUNT(wp.website_pageview_id) as total_page_hits
+      |
+      | FROM website_pageviews wp
+      | LEFT JOIN all_session_to_homepage sth ON sth.website_session_id = wp.website_session_id
+      | GROUP BY sth.website_session_id
+      | HAVING total_page_hits = 1
+      |
+      |
+      |""".stripMargin).createOrReplaceTempView("bounced_session_to_homepage")
 
 
+  //STEP 4 - Finding total session to bounced session for home page
+
+  spark.sql(
+    """
+      | SELECT
+      | COUNT(ash.website_session_id) as sessions,
+      | COUNT(bsh.website_session_id) as bounced_sessions,
+      | COUNT(bsh.website_session_id) / COUNT(ash.website_session_id) as bounce_rate
+      |
+      | FROM all_session_to_homepage ash
+      | LEFT JOIN bounced_session_to_homepage bsh on ash.website_session_id = bsh.website_session_id
+      |
+      |""".stripMargin).show(20,truncate = false)
+
+  /*+--------+----------------+------------------+
+    |sessions|bounced_sessions|bounce_rate       |
+    +--------+----------------+------------------+
+    |11048   |6538            |0.5917813178855902|
+    +--------+----------------+------------------+
+    */
+
+  println("For  /home and /lander-1 find total sessions ,bounce rate of each as of 2012-07-28 ")
+
+  //STEP 1 - Find the time when lander-1 was launched.So that we can limit the time frame for fair analysis.
+
+  spark.sql(
+    """
+      |
+      |SELECT
+      |MIN(DATE(created_at)) as first_launch_date
+      |
+      |FROM website_pageviews
+      |WHERE pageview_url = '/lander-1'
+      |
+      |""".stripMargin).show(10,truncate = false)
+
+  /*  +-----------------+
+      |first_launch_date|
+      +-----------------+
+      |2012-06-19       |
+      +-----------------+ */
 
 
+  spark.sql(
+    """
+      |
+      | SELECT
+      | wp.website_session_id as session_id,
+      | MIN(wp.website_pageview_id) as f_page_view
+      |
+      | FROM website_pageviews wp
+      | INNER JOIN website_sessions ws ON wp.website_session_id = ws.website_session_id
+      | WHERE ws.created_at BETWEEN '2012-06-19' AND '2012-07-28' AND ws.utm_source='gsearch' AND ws.utm_campaign = 'nonbrand'
+      | GROUP BY wp.website_session_id
+      | ORDER BY wp.website_session_id
+      |
+      |""".stripMargin).createOrReplaceTempView("all_session_first_page_view")
+
+  spark.sql(
+    """
+      |
+      | SELECT
+      |
+      | aspv.session_id,
+      | wp.pageview_url as landing_page
+      |
+      | FROM all_session_first_page_view aspv
+      | LEFT JOIN website_pageviews wp ON wp.website_pageview_id  = aspv.f_page_view
+      |
+      | WHERE wp.pageview_url IN ('/home','/lander-1')
+      |
+      | ORDER BY aspv.session_id
+      |
+      |""".stripMargin).createOrReplaceTempView("all_sessions_for_landers")
+
+  spark.sql(
+    """
+      |
+      | SELECT
+      |
+      | asl.session_id,
+      | asl.landing_page,
+      |
+      | COUNT(pv.website_pageview_id) as page_hits
+      |
+      | FROM all_sessions_for_landers asl
+      | LEFT JOIN website_pageviews pv ON pv.website_session_id = asl.session_id
+      | GROUP BY asl.session_id , asl.landing_page
+      | HAVING page_hits = 1
+      |
+      |
+      |""".stripMargin).createOrReplaceTempView("bounced_sessions_for_landers")
 
 
-
-
-
-
-
+  spark.sql(
+    """
+      |
+      | SELECT
+      | asl.landing_page,
+      | COUNT(asl.session_id) AS sessions,
+      | COUNT(bsl.session_id) AS bounced_session,
+      | COUNT(bsl.session_id) / COUNT(asl.session_id) as bounce_rate
+      |
+      | FROM all_sessions_for_landers asl
+      | LEFT JOIN bounced_sessions_for_landers bsl ON asl.session_id = bsl.session_id
+      | GROUP BY asl.landing_page
+      |
+      |""".stripMargin).show(100,truncate = false)
 
 
 
