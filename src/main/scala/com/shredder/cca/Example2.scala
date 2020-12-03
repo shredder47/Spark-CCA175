@@ -13,12 +13,12 @@ object Example2 extends App {
   spark.sparkContext.setLogLevel("ERROR")
 
 
-  spark.read.option("header",value = true).csv("data/orders.csv").createOrReplaceTempView("orders")
-  spark.read.option("header",value = true).csv("data/order_items.csv").createOrReplaceTempView("orders_items")
-  spark.read.option("header",value = true).csv("data/order_item_refunds.csv").createOrReplaceTempView("orders_items_refunds")
-  spark.read.option("header",value = true).csv("data/products.csv").createOrReplaceTempView("products")
-  spark.read.option("header",value = true).csv("data/website_pageviews.csv").createOrReplaceTempView("website_pageviews")
-  spark.read.option("header",value = true).csv("data/website_sessions.csv").createOrReplaceTempView("website_sessions")
+  spark.read.option("header",value = true).option("inferSchema",true).csv("data/orders.csv").createOrReplaceTempView("orders")
+  spark.read.option("header",value = true).option("inferSchema",true).csv("data/order_items.csv").createOrReplaceTempView("orders_items")
+  spark.read.option("header",value = true).option("inferSchema",true).csv("data/order_item_refunds.csv").createOrReplaceTempView("orders_items_refunds")
+  spark.read.option("header",value = true).option("inferSchema",true).csv("data/products.csv").createOrReplaceTempView("products")
+  spark.read.option("header",value = true).option("inferSchema",true).csv("data/website_pageviews.csv").createOrReplaceTempView("website_pageviews")
+  spark.read.option("header",value = true).option("inferSchema",true).csv("data/website_sessions.csv").createOrReplaceTempView("website_sessions")
 
 
   spark.sql(
@@ -261,6 +261,300 @@ object Example2 extends App {
       | ORDER BY total_hits DESC
       |
       |""".stripMargin).show(100,truncate = false)
+
+
+  println("First Page view per session ")
+  spark.sql(
+    """
+      | SELECT
+      | website_session_id,
+      | MIN(website_pageview_id) as first_page_view_id
+      |
+      | FROM website_pageviews
+      | GROUP BY website_session_id
+      | ORDER BY website_session_id
+      |
+      |""".stripMargin)
+    .createOrReplaceTempView("first_page_views")
+
+  spark.sql(
+    """
+      | SELECT
+      | first_page_views.website_session_id,
+      | website_pageviews.pageview_url AS landing_page
+      |
+      | FROM first_page_views
+      |
+      | LEFT JOIN website_pageviews ON first_page_views.first_page_view_id = website_pageviews.website_pageview_id
+      | ORDER BY 1
+      |
+      |""".stripMargin).show(10,truncate = false)
+
+  println("First Page view Total Hits ")
+
+  spark.sql(
+    """
+      | SELECT
+      |
+      | website_pageviews.pageview_url AS landing_page,
+      | COUNT(first_page_views.website_session_id) as total_hits
+      |
+      | FROM first_page_views
+      | LEFT JOIN website_pageviews ON first_page_views.first_page_view_id = website_pageviews.website_pageview_id
+      | GROUP BY 1
+      | ORDER BY 2 DESC
+      |
+      |
+      |""".stripMargin).show(10,truncate = false)
+
+  println("Most viewed pages as of (2012-06-09)")
+  spark.sql(
+    """
+      | SELECT
+      | pageview_url,
+      | COUNT(DISTINCT(website_pageview_id)) as sessions
+      |
+      | FROM website_pageviews
+      | WHERE created_at < '2012-06-09'
+      | GROUP BY pageview_url
+      | ORDER BY sessions DESC
+      |
+      |""".stripMargin).show(100,truncate = false)
+
+  println("Most viewed pages as of (2012-06-09)")
+  spark.sql(
+    """
+      | SELECT
+      | pageview_url,
+      | COUNT(DISTINCT(website_pageview_id)) as sessions
+      |
+      | FROM website_pageviews
+      | WHERE created_at < '2012-06-09'
+      | GROUP BY pageview_url
+      | ORDER BY sessions DESC
+      |
+      |""".stripMargin).show(100,truncate = false)
+
+      /* Most viewed pages as of (2012-06-09)
+       +-------------------------+--------+
+       |pageview_url             |sessions|
+       +-------------------------+--------+
+       |/home                    |10403   |
+       |/products                |4239    |
+       |/the-original-mr-fuzzy   |3037    |
+       |/cart                    |1306    |
+       |/shipping                |869     |
+       |/billing                 |716     |
+       |/thank-you-for-your-order|306     |
+       +-------------------------+--------+*/
+
+  // TODO: Trying finding performance of each page with various perf metrics.
+
+  println("First Page view per session as of ('2012-06-12')")
+  spark.sql(
+    """
+      | SELECT
+      | website_session_id,
+      | MIN(website_pageview_id) as first_page_view_id
+      |
+      | FROM website_pageviews
+      | WHERE created_at < '2012-06-12'
+      | GROUP BY website_session_id
+      | ORDER BY website_session_id
+      |
+      |""".stripMargin)
+    .createOrReplaceTempView("first_page_views")
+
+  println("Landing page hits as of ('2012-06-12') ")
+  spark.sql(
+    """
+      | SELECT
+      |
+      | website_pageviews.pageview_url AS landing_page,
+      | COUNT(first_page_views.website_session_id) as sessions_hitting_this_landing_page
+      |
+      | FROM first_page_views
+      | LEFT JOIN website_pageviews ON first_page_views.first_page_view_id = website_pageviews.website_pageview_id
+      | WHERE created_at < '2012-06-12'
+      | GROUP BY 1
+      | ORDER BY 2 DESC
+      |
+      |""".stripMargin).show(10,truncate = false)
+
+
+  println("Landing page performance between 2014-01-01 and 2014-02-01")
+
+  // STEP 1 - Finding landing pageview_id
+  spark.sql(
+    """
+      | SELECT
+      |
+      | website_sessions.website_session_id,
+      | MIN(website_pageviews.website_pageview_id) as first_pageview_id
+      |
+      | FROM website_pageviews
+      | INNER JOIN website_sessions ON website_sessions.website_session_id = website_pageviews.website_session_id
+      | WHERE website_sessions.created_at BETWEEN '2014-01-01' AND '2014-02-01'
+      | GROUP BY website_sessions.website_session_id
+      | ORDER BY website_sessions.website_session_id
+      |
+      |
+      |""".stripMargin).createOrReplaceTempView("first_page_views2")
+
+  // STEP 2 - Finding landing pageview_id with page name
+  spark.sql(
+    """
+      | SELECT
+      |
+      | first_page_views2.website_session_id,
+      | first_page_views2.first_pageview_id,
+      | website_pageviews.pageview_url AS landing_page
+      |
+      | FROM first_page_views2
+      | LEFT JOIN website_pageviews ON website_pageviews.website_pageview_id = first_page_views2.first_pageview_id
+      |
+      | ORDER BY 1
+      |
+      |""".stripMargin).createOrReplaceTempView("first_page_views_with_name")
+
+/*    +------------------+-----------------+------------+
+      |website_session_id|first_pageview_id|landing_page|
+      +------------------+-----------------+------------+
+      |175251            |415127           |/products   |
+      |175252            |415126           |/lander-2   |
+      |175253            |415128           |/home       |
+      |175254            |415134           |/lander-2   |
+      |175255            |415136           |/home       |
+      |175256            |415141           |/lander-2   |
+      |175257            |415145           |/lander-3   |
+      |175258            |415149           |/lander-2   |
+      |175259            |415153           |/home       |
+      |175260            |415154           |/lander-2   |
+      +------------------+-----------------+------------+
+      */
+
+  // STEP 3 - Finding every above session's page visit count.
+
+  spark.sql(
+    """
+      |
+      | SELECT
+      | first_page_views_with_name.website_session_id AS website_session_id,
+      | COUNT(DISTINCT(website_pageview_id)) AS total_page_visits
+      |
+      | FROM website_pageviews
+      | JOIN first_page_views_with_name ON website_pageviews.website_session_id = first_page_views_with_name.website_session_id
+      | GROUP BY first_page_views_with_name.website_session_id
+      | ORDER BY first_page_views_with_name.website_session_id
+      |
+      |
+      |""".stripMargin).createOrReplaceTempView("session_to_total_page_visits")
+
+      /* +------------------+-----------------+*/
+      /* |website_session_id|total_page_visits|*/
+      /* +------------------+-----------------+*/
+      /* |175251            |3                |*/
+      /* |175252            |3                |*/
+      /* |175253            |3                |*/
+      /* |175254            |6                |*/
+      /* |175255            |7                |*/
+      /* |175256            |1                |*/
+      /* |175257            |3                |*/
+      /* |175258            |2                |*/
+      /* |175259            |1                |*/
+      /* |175260            |1                |*/
+      /* +------------------+-----------------+*/
+
+  // STEP 4 - Now getting landing page of each sessions with the information above
+
+
+  spark.sql(
+    """
+      |
+      | SELECT
+      | landing_page,
+      | COUNT(CASE WHEN total_page_visits = 1 THEN 1 ELSE NULL END) AS total_bounced,
+      | COUNT(1) AS total_sessions,
+      | COUNT(CASE WHEN total_page_visits = 1 THEN 1 ELSE NULL END) / COUNT(1) AS bounce_ratio
+      |
+      |
+      | FROM first_page_views_with_name
+      | JOIN session_to_total_page_visits ON session_to_total_page_visits.website_session_id = first_page_views_with_name.website_session_id
+      | GROUP BY landing_page
+      |
+      |""".stripMargin).show(10,truncate = false)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
