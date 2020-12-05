@@ -773,6 +773,48 @@ object Example2 extends App {
   +--------------+-------------------+--------------------+------------------+------------------+---------------------+--------------------+*/
 
 
+  println("billing-2 vs billing page conversion for all traffic as of 2012-10-10")
+
+  //Step 1- Finding when billing-2 was first visited.
+
+  spark.sql(
+    """
+      |
+      |SELECT MIN(DATE(created_at)) as first_launch_date
+      |FROM website_pageviews
+      |WHERE pageview_url = '/billing-2'
+      |
+      |""".stripMargin).show(10,false)
+
+
+  spark.sql(
+    """
+      |
+      | SELECT
+      | wp.pageview_url,
+      | COUNT(DISTINCT wp.website_session_id) as sessions,
+      | COUNT(DISTINCT o.website_session_id) as orders,
+      | COUNT(DISTINCT o.website_session_id) /  COUNT(DISTINCT wp.website_session_id) as ratio
+      |
+      |
+      | FROM website_pageviews wp
+      | LEFT JOIN orders o ON o.website_session_id = wp.website_session_id
+      | WHERE wp.created_at BETWEEN '2012-09-10' AND '2012-11-10' AND wp.pageview_url IN ('/billing','/billing-2')
+      | GROUP BY wp.pageview_url
+      | ORDER BY wp.pageview_url
+      |
+      |
+      |""".stripMargin).show(10,truncate = false)
+
+
+//      +------------+--------+------+------------------+
+//      |pageview_url|sessions|orders|ratio             |
+//      +------------+--------+------+------------------+
+//      |/billing    |657     |300   |0.45662100456621  |
+//      |/billing-2  |654     |410   |0.6269113149847095|
+//      +------------+--------+------+------------------+
+
+
   spark.close()
 
 }
