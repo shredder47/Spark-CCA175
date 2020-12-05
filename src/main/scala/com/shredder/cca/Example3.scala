@@ -1,8 +1,8 @@
-package com.shredder.cca.util
+package com.shredder.cca
 
 import org.apache.spark.sql.SparkSession
 
-object Example3 extends App{
+object Example3 extends App {
 
   val spark = SparkSession
     .builder()
@@ -37,7 +37,7 @@ object Example3 extends App{
       | GROUP BY month(ws.created_at)
       | ORDER by start_date
       |
-      |""".stripMargin).show(100,truncate = false)
+      |""".stripMargin).show(100, truncate = false)
 
   println("Monthly Trends for gsearch sessions and orders splitted by nonbrand and brand!")
 
@@ -60,8 +60,7 @@ object Example3 extends App{
       | GROUP BY  month(ws.created_at)
       | ORDER by start_date
       |
-      |""".stripMargin).show(100,truncate = false)
-
+      |""".stripMargin).show(100, truncate = false)
 
 
   println("For gsearch nonbrand, monthly session and order split by device type")
@@ -85,7 +84,7 @@ object Example3 extends App{
       | GROUP BY  month(ws.created_at)
       | ORDER by start_date
       |
-      |""".stripMargin).show(100,truncate = false)
+      |""".stripMargin).show(100, truncate = false)
 
   println("Monthly Trends for GSEARCH along with monthly trends for other channel!")
   spark.sql(
@@ -107,7 +106,7 @@ object Example3 extends App{
       | GROUP BY  month(ws.created_at)
       | ORDER by start_date
       |
-      |""".stripMargin).show(100,truncate = false)
+      |""".stripMargin).show(100, truncate = false)
 
   println("Sales to order conversion by month for first 8 month!")
   spark.sql(
@@ -124,7 +123,7 @@ object Example3 extends App{
       | GROUP BY  month(ws.created_at)
       | ORDER by start_date
       |
-      |""".stripMargin).show(100,truncate = false)
+      |""".stripMargin).show(100, truncate = false)
 
 
   spark.stop()
