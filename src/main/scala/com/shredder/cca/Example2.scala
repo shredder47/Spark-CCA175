@@ -660,56 +660,117 @@ object Example2 extends App {
       |""".stripMargin).show(100,truncate = false)
 
 
+  println("For /home and /lander-1 find weekly trended data for paid nonbrand traffic's bounce rate since 1st june 2012 - AS of 2012-08-31 ")
+
+  //STEP 1 - session's first landing page that are lander-1 or home with timestamp
+
+  spark.sql(
+    """
+      |
+      | SELECT
+      | session_to_fpv.session_id,
+      | session_to_fpv.page_view_ts,
+      | website_pageviews.pageview_url as lander_page
+      | FROM
+      |
+      | (
+      |   SELECT
+      |   wp.website_session_id AS session_id,
+      |   MIN(wp.website_pageview_id) AS first_page_view,
+      |   wp.created_at AS page_view_ts
+      |   FROM website_pageviews wp
+      |   LEFT JOIN website_sessions ws on wp.website_session_id = ws.website_session_id
+      |   WHERE wp.created_at BETWEEN '2012-06-01' AND '2012-08-31' AND ws.utm_source='gsearch' AND ws.utm_campaign = 'nonbrand' AND wp.pageview_url IN ('/home','/lander-1')
+      |   GROUP BY wp.website_session_id,wp.created_at
+      | ) AS session_to_fpv
+      |
+      | INNER JOIN website_pageviews ON session_to_fpv.first_page_view = website_pageviews.website_pageview_id
+      |
+      |""".stripMargin).createOrReplaceTempView("session_to_lander_over_time")
+
+
+  //STEP 2- Sessions that are bounced.
+
+  spark.sql(
+    """
+      |
+      | SELECT
+      |
+      | wp.website_session_id as session_id,
+      | COUNT(wp.website_pageview_id) as total_page_views
+      |
+      | FROM session_to_lander_over_time slt
+      | INNER JOIN website_pageviews wp ON slt.session_id = wp.website_session_id
+      | GROUP BY wp.website_session_id
+      | HAVING total_page_views = 1
+      |
+      |""".stripMargin).createOrReplaceTempView("sessions_bounced")
+
+    // STEP 3- GET required info from session_to_lander_over_time and sessions_bounced
+
+  spark.sql(
+    """
+      |
+      | SELECT
+      |
+      | MIN(DATE(page_view_ts)) as start_date,
+      | COUNT(sb.session_id) / COUNT(slt.session_id) AS bounced_sessions,
+      | COUNT(CASE WHEN slt.lander_page = '/home' THEN 1 ELSE NULL END) AS home_sessions,
+      | COUNT(CASE WHEN slt.lander_page = '/lander-1' THEN 1 ELSE NULL END) AS lander_sessions
+      |
+      | FROM session_to_lander_over_time slt
+      | LEFT JOIN sessions_bounced sb  ON slt.session_id = sb.session_id
+      | GROUP BY date_format(slt.page_view_ts,'w')
+      | ORDER BY start_date
+      |
+      |
+      |""".stripMargin).show(100,false)
 
 
 
+  println("Analyze conversion funnel for gsearch for lander-1 page (/products ,  /the-original-mr-fuzzy ,  /cart ,   /shipping , /billing ,  /thank-you-for-your-order ) using data between 2012-08-05 to 2012-09-05")
+
+  spark.sql(
+    """
+      | SELECT
+      | ws.website_session_id,
+      | COUNT( CASE WHEN wp.pageview_url = '/products' THEN 1 ELSE NULL END ) as to_product,
+      | COUNT( CASE WHEN wp.pageview_url = '/the-original-mr-fuzzy' THEN 1 ELSE NULL END ) as to_fuzzy,
+      | COUNT( CASE WHEN wp.pageview_url = '/cart' THEN 1 ELSE NULL END ) as to_cart,
+      | COUNT( CASE WHEN wp.pageview_url = '/shipping' THEN 1 ELSE NULL END ) as to_shipping,
+      | COUNT( CASE WHEN wp.pageview_url = '/billing' THEN 1 ELSE NULL END ) as to_billing,
+      | COUNT( CASE WHEN wp.pageview_url = '/thank-you-for-your-order' THEN 1 ELSE NULL END ) as to_thankyou
+      |
+      | FROM website_pageviews wp
+      | JOIN website_sessions ws ON ws.website_session_id = wp.website_session_id
+      | WHERE ws.created_at BETWEEN  '2012-08-05' AND '2012-09-05' AND ws.utm_source = 'gsearch' AND ws.utm_campaign = 'nonbrand'
+      | GROUP BY ws.website_session_id
+      | ORDER BY ws.website_session_id
+      |
+      |""".stripMargin).createOrReplaceTempView("sessions_to_pagevisits")
 
 
+  spark.sql(
+    """
+      |
+      | SELECT
+      | COUNT(stp.website_session_id) as total_sessions,
+      | SUM(stp.to_product) / COUNT(stp.website_session_id) as lander_clickthrough,
+      | SUM(stp.to_fuzzy) / SUM(stp.to_product) as product_clickthrough,
+      | SUM(stp.to_cart) / SUM(stp.to_fuzzy)  as fuzzy_clickthrough,
+      | SUM(stp.to_shipping) / SUM(stp.to_cart)  as cart_clickthrough,
+      | SUM(stp.to_billing)/SUM(stp.to_shipping) as shipping_clickthrough,
+      | SUM(stp.to_thankyou)/SUM(stp.to_billing) as billing_clickthrough
+      |
+      | FROM sessions_to_pagevisits stp
+      |
+      |""".stripMargin).show(100,truncate = false)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+/*  +--------------+-------------------+--------------------+------------------+------------------+---------------------+--------------------+
+  |total_sessions|lander_clickthrough|product_clickthrough|fuzzy_clickthrough|cart_clickthrough |shipping_clickthrough|billing_clickthrough|
+  +--------------+-------------------+--------------------+------------------+------------------+---------------------+--------------------+
+  |4493          |0.4707322501669263 |0.7408983451536643  |0.4358647096362476|0.6661786237188873|0.7934065934065934   |0.4376731301939058  |
+  +--------------+-------------------+--------------------+------------------+------------------+---------------------+--------------------+*/
 
 
   spark.close()
