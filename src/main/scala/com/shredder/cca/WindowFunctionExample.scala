@@ -25,9 +25,9 @@ object WindowFunctionExample extends App {
     (15,"2012-01-20",1,0),
     (16,"2012-01-21",1,0),
     (17,"2012-01-22",1,0),
-    (18,"2012-01-23",1,0),
+    (18,"2012-01-23",1,1),
     (19,"2012-01-24",1,0),
-    (20,"2012-01-25",1,0),
+    (20,"2012-01-25",1,1),
     (21,"2012-01-26",1,1),
     (22,"2012-01-27",1,0),
     (23,"2012-01-28",1,0),
@@ -40,6 +40,7 @@ object WindowFunctionExample extends App {
     (30,"2012-01-18",2,1),
   ).toDF("id","date","emp_id","is_absent").createOrReplaceTempView("attendance")
 
+  println("Find employee who took leave for 3 consecutive days")
 
   spark.sql(
     """
