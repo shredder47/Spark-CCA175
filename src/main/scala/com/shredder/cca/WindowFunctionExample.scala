@@ -49,18 +49,24 @@ object WindowFunctionExample extends App {
 
   spark.sql(
     """
+      | SELECT
       |
-      |SELECT
-      | emp_id,
-      | date,
-      | is_absent,
-      | CASE WHEN is_absent = 1 THEN true ELSE false END as t_0,
-      | CASE WHEN LEAD(is_absent,1) OVER (PARTITION BY emp_id ORDER BY date ) = 1 THEN true ELSE false END as t_1,
-      | CASE WHEN LEAD(is_absent,2) OVER (PARTITION BY emp_id ORDER BY date ) = 1 THEN true ELSE false END as t_2,
-      | CASE WHEN LEAD(is_absent,3) OVER (PARTITION BY emp_id ORDER BY date ) = 1 THEN true ELSE false END as t_3
-      |FROM attendance
-      |ORDER BY emp_id, date
+      |   emp_id , date
       |
+      | FROM
+      | (
+      |   SELECT
+      |    emp_id,
+      |    date,
+      |    is_absent,
+      |    CASE WHEN is_absent = 1 THEN true ELSE false END as t_0,
+      |    CASE WHEN LEAD(is_absent,1) OVER (PARTITION BY emp_id ORDER BY date ) = 1 THEN true ELSE false END as t_1,
+      |    CASE WHEN LEAD(is_absent,2) OVER (PARTITION BY emp_id ORDER BY date ) = 1 THEN true ELSE false END as t_2
+      |   FROM attendance
+      |   ORDER BY emp_id, date
+      | ) as attendance_tally
+      | WHERE t_0 = false AND t_1 = false AND t_2 = false
+      | ORDER BY emp_id, date
       |
       |""".stripMargin).show(100,truncate = false)
 
