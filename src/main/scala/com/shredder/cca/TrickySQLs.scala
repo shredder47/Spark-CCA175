@@ -127,4 +127,84 @@ object TrickySQLs extends App {
       |          ) as tmp
       | )
       |""".stripMargin).show(100,truncate = false)
+
+  /* ------------------------------------------------------------------------------------------------------------------*/
+
+  /* Pivot the Occupation column in OCCUPATIONS so that each Name is sorted alphabetically and displayed underneath its corresponding Occupation. The output column headers should be Doctor, Professor, Singer, and Actor, respectively.
+
+     Note: Print NULL when there are no more names corresponding to an occupation.
+  */
+
+  Seq(
+    ("Samantha","Doctor"),
+    ("Julia","Actor"),
+    ("Maria","Actor"),
+    ("Meera","Singer"),
+    ("Ashley","Professor"),
+    ("Ketty","Professor"),
+    ("Christeen","Professor"),
+    ("Jane","Actor"),
+    ("Jenny","Doctor"),
+    ("Priya","Singer"),
+  ).toDF("Name","Occupation").createOrReplaceTempView("occupations")
+
+  /** NOTE : The use Of ROW NUMBERS is important so that we can group the data by row */
+
+  spark.sql(
+    """
+      | SELECT MAX(Doctor) AS doctors, MAX(Professor) AS Professors , MAX(Singer) AS Singers, MAX(Actor) AS Actors
+      | FROM (
+      |          SELECT ROW_NUMBER() over (PARTITION BY occupation ORDER BY name) AS rn,
+      |                 (CASE WHEN occupation = 'Doctor' THEN name END)           AS Doctor,
+      |                 (CASE WHEN occupation = 'Actor' THEN name END)            AS Actor,
+      |                 (CASE WHEN occupation = 'Singer' THEN name END)           AS Singer,
+      |                 (CASE WHEN occupation = 'Professor' THEN name END)        AS Professor
+      |
+      |          FROM occupations
+      |      ) AS tmp
+      | GROUP BY rn
+      | ORDER BY rn
+      |
+      |""".stripMargin).show(100,truncate = false)
+
+  /**
+   *
+   * EXPLANATION:
+   *
+   *  SELECT ROW_NUMBER() over (PARTITION BY occupation ORDER BY name) AS rn,
+                (CASE WHEN occupation = 'Doctor' THEN name END)           AS Doctor,
+                (CASE WHEN occupation = 'Actor' THEN name END)            AS Actor,
+                (CASE WHEN occupation = 'Singer' THEN name END)           AS Singer,
+                (CASE WHEN occupation = 'Professor' THEN name END)        AS Professor
+
+         FROM occupations
+        ORDER BY rn
+
+    Will Return :
+
+    1,NULL,Jane,NULL,NULL
+    1,Jenny,NULL,NULL,NULL
+    1,NULL,NULL,NULL,Ashley
+    1,NULL,NULL,Meera,NULL
+    2,NULL,Julia,NULL,NULL
+    2,Samantha,NULL,NULL,NULL
+    2,NULL,NULL,NULL,Christeen
+    2,NULL,NULL,Priya,NULL
+    3,NULL,Maria,NULL,NULL
+    3,NULL,NULL,NULL,Ketty
+
+    Now Grouping this will give us the final result
+    +--------+----------+-------+------+
+    |doctors |Professors|Singers|Actors|
+    +--------+----------+-------+------+
+    |Jenny   |Ashley    |Meera  |Jane  |
+    |Samantha|Christeen |Priya  |Julia |
+    |null    |Ketty     |null   |Maria |
+    +--------+----------+-------+------+
+   *
+   *
+   */
+
+  /* ------------------------------------------------------------------------------------------------------------------*/
+
 }
