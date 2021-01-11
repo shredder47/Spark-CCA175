@@ -77,4 +77,54 @@ object TrickySQLs extends App {
       |
       |""".stripMargin).show(100)
 
+  /* ------------------------------------------------------------------------------------------------------------------*/
+
+  /* Generate the following two result sets:
+
+     Query an alphabetically ordered list of all names in OCCUPATIONS, immediately followed by the first letter of each profession as a parenthetical (i.e.: enclosed in parentheses). For example: AnActorName(A), ADoctorName(D), AProfessorName(P), and ASingerName(S).
+     Query the number of ocurrences of each occupation in OCCUPATIONS. Sort the occurrences in ascending order, and output them in the following format:
+
+     There are a total of [occupation_count] [occupation]s.
+     where [occupation_count] is the number of occurrences of an occupation in OCCUPATIONS and [occupation] is the lowercase occupation name. If more than one Occupation has the same [occupation_count], they should be ordered alphabetically.
+
+     The results of the second query are ascending ordered first by number of names corresponding to each profession , and then alphabetically by profession
+  */
+
+  Seq(
+    ("Samantha","Doctor"),
+    ("Julia","Actor"),
+    ("Maria","Actor"),
+    ("Meera","Singer"),
+    ("Ashley","Professor"),
+    ("Ketty","Professor"),
+    ("Christeen","Professor"),
+    ("Jane","Actor"),
+    ("Jenny","Doctor"),
+    ("Priya","Singer"),
+  ).toDF("Name","Occupation").createOrReplaceTempView("occupations")
+
+  /** NOTE : The use Of LIMIT is important here to retain the ordering after UNION Operation for Traditional SQL engines also for SPARK SQL */
+  spark.sql(
+    """
+      | (
+      |     SELECT CONCAT(name, '(', LEFT(Occupation, 1), ')') as row_one
+      |     FROM (
+      |              SELECT name, occupation
+      |              FROM occupations
+      |              ORDER BY name ASC
+      |              LIMIT 1000
+      |          ) as tmp
+      | )
+      | UNION ALL
+      | (
+      |     SELECT CONCAT('There are a total of ', cnt, ' ', prop, 's.') as row_one
+      |     FROM (
+      |              SELECT COUNT(Occupation) as cnt, LOWER(Occupation) as prop
+      |              FROM occupations
+      |              GROUP BY LOWER(Occupation)
+      |              ORDER BY 1, 2 ASC
+      |              LIMIT 1000
+      |          ) as tmp
+      | )
+      |""".stripMargin).show(100,truncate = false)
 }
