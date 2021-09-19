@@ -13,6 +13,8 @@ object Example1 extends App {
 
   spark.sparkContext.setLogLevel("ERROR")
 
+  //Creating connection object
+  //Next comment
   val connection = new Connection(
     spark,
     "root",
