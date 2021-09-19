@@ -23,6 +23,7 @@ object Example1 extends App {
     "jdbc:mysql://localhost:3306/")
 
   //new code
+  //experimental code
 
   connection.getTableAsDataframe("actor").createOrReplaceTempView("actor")
   connection.getTableAsDataframe("address").createOrReplaceTempView("address")
