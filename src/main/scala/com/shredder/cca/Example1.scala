@@ -22,6 +22,8 @@ object Example1 extends App {
     "sakila",
     "jdbc:mysql://localhost:3306/")
 
+  //Java16 not supported
+
   connection.getTableAsDataframe("actor").createOrReplaceTempView("actor")
   connection.getTableAsDataframe("address").createOrReplaceTempView("address")
   connection.getTableAsDataframe("category").createOrReplaceTempView("category")
